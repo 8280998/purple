@@ -17,11 +17,11 @@ const erc20Abi = [
 ];
 
 const betAbi = [
-    'event BetPlaced(address indexed user, uint256 blockNum, bytes1 guess, uint256 amount)',
-    'event Claimed(address indexed user, uint256 blockNum, bool won, uint256 payout)',
-    'function placeBet(bytes1 _guess, uint256 _amount) external',
-    'function claim(uint256 _blockNum) external',
-    'function bets(address, uint256) external view returns (bytes1 guess, uint256 amount, bool claimed)',
+    'event BetPlaced(uint256 indexed betId, address indexed user, bytes1 guess, uint256 amount, uint256 blockNumber)',
+    'event BetResolved(uint256 indexed betId, address indexed user, bytes1 targetByte, bool won, uint256 reward)',
+    'function placeBet(bytes1 guess, uint256 amount) external returns (uint256)',
+    'function resolveBet(uint256 betId) external',
+    'function getBet(uint256 betId) external view returns (address user, bytes1 guess, uint256 amount, bytes1 targetByte, bool won, uint256 reward, uint256 blockNumber, bool resolved)',
     'function getContractBalance() external view returns (uint256)'
 ];
 
@@ -71,7 +71,7 @@ async function updateContractBalance() {
         console.log('Balance updated:', formattedBalance);
     } catch (err) {
         console.error('Error updating balance:', err.message);
-        document.getElementById('contractBalance').textContent = 'Purple pool: 查询失败 - 检查合约地址和网络';
+        document.getElementById('contractBalance').textContent = 'Purple pool: error';
     }
 }
 
@@ -219,7 +219,7 @@ document.getElementById('placeBet').onclick = async () => {
 
 async function addLog(blockNum, guess, amount) {
     const logs = getLogs();
-    logs.push({ blockNum, guess, amount, status: 'Pending' });
+    logs.push({ blockNum, guess, amount, status: 'Pending', tail: '' });
     saveLogs(logs);
     renderLogs();
 
@@ -230,7 +230,8 @@ async function addLog(blockNum, guess, amount) {
                 clearInterval(interval);
                 const tx = await betContract.claim(blockNum);
                 await tx.wait();
-                updateLogStatus(blockNum, 'Claimed (Check wallet for reward)');
+                const tail = getLastHexChar(block.hash);
+                updateLogStatus(blockNum, 'Claimed (Check wallet for reward)', tail);
             }
         } catch (err) {
             console.error('Add log error:', err.message);
@@ -238,11 +239,22 @@ async function addLog(blockNum, guess, amount) {
     }, 2000);
 }
 
-function updateLogStatus(blockNum, status) {
+function getLastHexChar(hash) {
+    const lastByte = hash.slice(-2); // Last byte as hex string
+    const lastNibble = parseInt(lastByte, 16) & 0x0F;
+    if (lastNibble < 10) {
+        return lastNibble.toString();
+    } else {
+        return String.fromCharCode(97 + (lastNibble - 10)); // a-f
+    }
+}
+
+function updateLogStatus(blockNum, status, tail) {
     const logs = getLogs();
     const log = logs.find(l => l.blockNum === blockNum);
     if (log) {
         log.status = status;
+        log.tail = tail;
         if (status.includes('Win')) log.highlight = true;
     }
     saveLogs(logs);
@@ -262,7 +274,7 @@ function renderLogs() {
     list.innerHTML = '';
     getLogs().forEach(log => {
         const li = document.createElement('li');
-        li.textContent = `Block: ${log.blockNum}, Guess: ${log.guess}, Amount: ${log.amount}, Status: ${log.status}`;
+        li.textContent = `Block: ${log.blockNum}, Tail: ${log.tail || 'Pending'}, Guess: ${log.guess}, Amount: ${log.amount}, Status: ${log.status}`;
         if (log.highlight) li.classList.add('win');
         list.appendChild(li);
     });
