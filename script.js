@@ -1,10 +1,10 @@
 const tokenAddress = '0xd642b49d10cc6e1bc1c6945725667c35e0875f22';
-const contractAddress = '0x8EfED44e1Ed675C7aE460D2a71DAAf34F382a3BD'; // 合约地址
+const contractAddress = '0x8EfED44e1Ed675C7aE460D2a71DAAf34F382a3BD';
 const rpcUrl = 'https://rpc-gel.inkonchain.com';
 const chainId = 57073;
 const decimals = 18;
 
-const provider = new ethers.JsonRpcProvider(rpcUrl);
+const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
 let signer, tokenContract, betContract;
 let selectedGuess = '';
 let selectedAmount = 0;
@@ -66,7 +66,7 @@ async function updateContractBalance() {
         console.log('Updating balance with contract:', contractAddress);
         const tempToken = new ethers.Contract(tokenAddress, erc20Abi, provider);
         const balance = await tempToken.balanceOf(contractAddress);
-        const formattedBalance = ethers.formatUnits(balance, decimals);
+        const formattedBalance = ethers.utils.formatUnits(balance, decimals);
         document.getElementById('contractBalance').textContent = `Purple pool: ${formattedBalance}`;
         console.log('Balance updated:', formattedBalance);
     } catch (err) {
@@ -105,8 +105,8 @@ async function updateBetButton() {
         try {
             const tempToken = new ethers.Contract(tokenAddress, erc20Abi, provider);
             const balance = await tempToken.balanceOf(contractAddress);
-            const required = BigInt(selectedAmount) * BigInt(12);
-            if (balance < required) {
+            const required = ethers.BigNumber.from(selectedAmount).mul(12);
+            if (balance.lt(required)) {
                 btn.disabled = true;
                 alert('合约余额不足以支付潜在奖励 (需 > 12x 下注额)');
             }
@@ -133,8 +133,8 @@ document.getElementById('connectWallet').onclick = async () => {
 
     try {
         await walletProvider.request({ method: 'eth_requestAccounts' });
-        const ethersProvider = new ethers.BrowserProvider(walletProvider);
-        signer = await ethersProvider.getSigner();
+        const ethersProvider = new ethers.providers.Web3Provider(walletProvider);
+        signer = ethersProvider.getSigner();
         const address = await signer.getAddress();
         document.getElementById('walletStatus').textContent = `Connected: ${address.slice(0,6)}...${address.slice(-4)}`;
         console.log('Wallet connected:', address);
@@ -200,12 +200,13 @@ document.getElementById('placeBet').onclick = async () => {
 
     try {
         const allowance = await tokenContract.allowance(await signer.getAddress(), contractAddress);
-        if (allowance < BigInt(selectedAmount)) {
-            const approveTx = await tokenContract.approve(contractAddress, BigInt(selectedAmount));
+        if (allowance.lt(ethers.BigNumber.from(selectedAmount))) {
+            const approveTx = await tokenContract.approve(contractAddress, ethers.BigNumber.from(selectedAmount));
             await approveTx.wait();
         }
 
-        const tx = await betContract.placeBet(ethers.toUtf8Bytes(selectedGuess)[0], BigInt(selectedAmount));
+        const guessByte = ethers.utils.toUtf8Bytes(selectedGuess)[0];
+        const tx = await betContract.placeBet(guessByte, ethers.BigNumber.from(selectedAmount));
         const receipt = await tx.wait();
 
         updateContractBalance();
