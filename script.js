@@ -1,5 +1,5 @@
 const tokenAddress = '0xd642b49d10cc6e1bc1c6945725667c35e0875f22';
-const contractAddress = '0x7ffd4680bff22d42ab47164d092988339cedf29e'; //合约地址
+const contractAddress = '0x7ffd4680bff22d42ab47164d092988339cedf29e';
 const rpcUrl = 'https://rpc-gel.inkonchain.com';
 const chainId = 57073;
 
@@ -7,7 +7,7 @@ const provider = new ethers.JsonRpcProvider(rpcUrl);
 let signer, tokenContract, betContract;
 let selectedGuess = '';
 let selectedAmount = 0;
-let selectedButton = null; // 用于高亮单选
+let selectedButton = null;
 
 const erc20Abi = [
     'function approve(address spender, uint256 amount) external returns (bool)',
@@ -25,10 +25,12 @@ const betAbi = [
 ];
 
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM loaded, initializing...');
     init();
 });
 
 async function init() {
+    console.log('Init started');
     const guesses = '0123456789abcdef'.split('');
     const guessButtons = document.getElementById('guessButtons');
     guesses.forEach(g => {
@@ -43,15 +45,23 @@ async function init() {
         };
         guessButtons.appendChild(btn);
     });
+    console.log('Guess buttons created');
 
     loadLogs();
-    updateContractBalance();
+    updateContractBalance().catch(err => console.error('Balance update error:', err));
 }
 
 async function updateContractBalance() {
-    const tempContract = new ethers.Contract(contractAddress, betAbi, provider);
-    const balance = await tempContract.getContractBalance();
-    document.getElementById('contractBalance').textContent = ` Purple pool: ${balance.toString()}`;
+    try {
+        console.log('Updating balance...');
+        const tempContract = new ethers.Contract(contractAddress, betAbi, provider);
+        const balance = await tempContract.getContractBalance();
+        document.getElementById('contractBalance').textContent = `Purple pool: ${balance.toString()}`;
+        console.log('Balance updated:', balance.toString());
+    } catch (err) {
+        console.error('Error updating balance:', err);
+        document.getElementById('contractBalance').textContent = ' Purple pool: error';
+    }
 }
 
 function setAmount(amount) {
@@ -75,45 +85,53 @@ async function updateBetButton() {
     btn.disabled = !signer || !selectedGuess || selectedAmount <= 0;
 
     if (selectedAmount > 0) {
-        const tempContract = new ethers.Contract(contractAddress, betAbi, provider);
-        const balance = await tempContract.getContractBalance();
-        const required = selectedAmount * 12;
-        if (balance < required) {
-            btn.disabled = true;
-            alert('合约余额不足以支付潜在奖励 (需 > 12x 下注额)');
+        try {
+            const tempContract = new ethers.Contract(contractAddress, betAbi, provider);
+            const balance = await tempContract.getContractBalance();
+            const required = selectedAmount * 12;
+            if (balance < required) {
+                btn.disabled = true;
+                alert('合约余额不足以支付潜在奖励 (需 > 12x 下注额)');
+            }
+        } catch (err) {
+            console.error('Error in updateBetButton:', err);
         }
     }
 }
 
 document.getElementById('connectWallet').onclick = async () => {
+    console.log('Connect button clicked');
     let walletProvider;
     if (window.ethereum) {
-        walletProvider = window.ethereum; // MetaMask or compatible
+        walletProvider = window.ethereum;
+        console.log('MetaMask detected');
     } else if (window.okxwallet) {
-        walletProvider = window.okxwallet; // OKX
+        walletProvider = window.okxwallet;
+        console.log('OKX detected');
     } else if (window.coinbaseWallet) {
-        walletProvider = window.coinbaseWallet; // Coinbase
+        walletProvider = window.coinbaseWallet;
+        console.log('Coinbase detected');
     } else {
         alert('No supported wallet detected. Install MetaMask, OKX, or Coinbase Wallet extension.');
+        console.log('No wallet detected');
         return;
     }
 
     try {
-        // Request accounts (will popup permission)
         await walletProvider.request({ method: 'eth_requestAccounts' });
         const ethersProvider = new ethers.BrowserProvider(walletProvider);
         signer = await ethersProvider.getSigner();
         const address = await signer.getAddress();
         document.getElementById('walletStatus').textContent = `Connected: ${address.slice(0,6)}...`;
+        console.log('Wallet connected:', address);
 
-        // Add and switch to INK chain if needed
         try {
             await walletProvider.request({
                 method: 'wallet_switchEthereumChain',
                 params: [{ chainId: `0x${chainId.toString(16)}` }],
             });
         } catch (switchError) {
-            if (switchError.code === 4902) { // Chain not added
+            if (switchError.code === 4902) {
                 await walletProvider.request({
                     method: 'wallet_addEthereumChain',
                     params: [{
@@ -124,6 +142,8 @@ document.getElementById('connectWallet').onclick = async () => {
                         blockExplorerUrls: ['https://explorer.inkonchain.com']
                     }],
                 });
+            } else {
+                console.error('Switch chain error:', switchError);
             }
         }
 
@@ -134,11 +154,12 @@ document.getElementById('connectWallet').onclick = async () => {
         updateContractBalance();
         setupEventListeners();
     } catch (err) {
-        console.error(err);
+        console.error('Connection error:', err);
         alert('连接失败，请检查钱包和网络');
     }
 };
 
+// 其余函数不变: placeBet, setupEventListeners, addLog, updateLogStatus, getLogs, saveLogs, renderLogs, loadLogs
 document.getElementById('placeBet').onclick = async () => {
     if (!selectedGuess || selectedAmount <= 0) return;
 
