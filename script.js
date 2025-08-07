@@ -71,7 +71,7 @@ async function updateContractBalance() {
         console.log('Balance updated:', formattedBalance);
     } catch (err) {
         console.error('Error updating balance:', err.message);
-        document.getElementById('contractBalance').textContent = 'Purple pool: error';
+        document.getElementById('contractBalance').textContent = 'Purple pool: 查询失败 - 检查合约地址和网络';
     }
 }
 
@@ -105,10 +105,10 @@ async function updateBetButton() {
         try {
             const tempToken = new ethers.Contract(tokenAddress, erc20Abi, provider);
             const balance = await tempToken.balanceOf(contractAddress);
-            const required = ethers.BigNumber.from(selectedAmount).mul(12);
+            const required = ethers.utils.parseUnits(selectedAmount.toString(), decimals).mul(12);
             if (balance.lt(required)) {
                 btn.disabled = true;
-                alert('合约余额不足以支付潜在奖励 (需 > 12x 下注额)');
+                alert('Contract balance insufficient for potential reward (need > 12x bet amount)');
             }
         } catch (err) {
             console.error('Error in updateBetButton:', err);
@@ -200,13 +200,14 @@ document.getElementById('placeBet').onclick = async () => {
 
     try {
         const allowance = await tokenContract.allowance(await signer.getAddress(), contractAddress);
-        if (allowance.lt(ethers.BigNumber.from(selectedAmount))) {
-            const approveTx = await tokenContract.approve(contractAddress, ethers.BigNumber.from(selectedAmount));
+        const betAmount = ethers.utils.parseUnits(selectedAmount.toString(), decimals);
+        if (allowance.lt(betAmount)) {
+            const approveTx = await tokenContract.approve(contractAddress, betAmount);
             await approveTx.wait();
         }
 
-        const guessByte = ethers.utils.toUtf8Bytes(selectedGuess)[0];
-        const tx = await betContract.placeBet(guessByte, ethers.BigNumber.from(selectedAmount));
+        const guessByte = '0x' + selectedGuess.charCodeAt(0).toString(16).padStart(2, '0');
+        const tx = await betContract.placeBet(guessByte, betAmount);
         const receipt = await tx.wait();
 
         updateContractBalance();
