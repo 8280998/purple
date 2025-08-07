@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>INK Block Hash Bet</title>
+    <script src="https://cdn.ethers.io/lib/ethers-6.7.umd.min.js"></script>
+    <!-- Web3Modal CDN -->
+    <script src="https://unpkg.com/@web3modal/standalone@latest/dist/web3modal.js"></script>
+    <script src="https://unpkg.com/@walletconnect/ethereum-provider@2.10.0/dist/umd/index.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; }
+        .options { margin: 20px; }
+        button { margin: 5px; padding: 10px; }
+        #logs { margin-top: 20px; border: 1px solid #ccc; padding: 10px; max-width: 600px; margin: auto; }
+        .win { background-color: yellow; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>INK Block Hash Bet</h1>
+    <button id="connectWallet">Connect Wallet</button>
+    <p id="walletStatus"></p>
+    <p id="contractBalance">Purple : loading...</p>
+
+    <div class="options">
+        <h3>Choose Guess (0-9, a-f):</h3>
+        <div id="guessButtons"></div>
+    </div>
+
+    <div class="options">
+        <h3>Bet Amount:</h3>
+        <button onclick="setAmount(100)">100</button>
+        <button onclick="setAmount(500)">500</button>
+        <button onclick="setAmount(1000)">1000</button>
+        <input type="number" id="amountInput" placeholder="Custom" min="1" max="10000">
+    </div>
+
+    <button id="placeBet" disabled>Place Bet</button>
+
+    <div id="logs">
+        <h3>Betting Logs</h3>
+        <ul id="logList"></ul>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
