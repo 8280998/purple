@@ -1,5 +1,5 @@
 const tokenAddress = '0xd642b49d10cc6e1bc1c6945725667c35e0875f22';
-const contractAddress = '0x8efed44e1ed675c7ae460d2a71daaf34f382a3bd'; // 更新为您的合约地址
+const contractAddress = '0x8efed44e1ed675c7ae460d2a71daaf34f382a3bd'; // 
 const rpcUrl = 'https://rpc-gel.inkonchain.com';
 const chainId = 57073;
 
@@ -27,6 +27,11 @@ const betAbi = [
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM loaded, initializing...');
     init();
+
+    // 修复 100/500/1000 按钮
+    document.getElementById('bet100').onclick = () => setAmount(100);
+    document.getElementById('bet500').onclick = () => setAmount(500);
+    document.getElementById('bet1000').onclick = () => setAmount(1000);
 });
 
 async function init() {
@@ -59,7 +64,6 @@ async function init() {
 async function updateContractBalance() {
     try {
         console.log('Updating balance with contract:', contractAddress);
-        // Fallback to direct token balanceOf if getContractBalance fails
         const tempToken = new ethers.Contract(tokenAddress, erc20Abi, provider);
         const balance = await tempToken.balanceOf(contractAddress);
         document.getElementById('contractBalance').textContent = ` Purple pool: ${balance.toString()}`;
@@ -126,11 +130,11 @@ document.getElementById('connectWallet').onclick = async () => {
         const ethersProvider = new ethers.BrowserProvider(walletProvider);
         signer = await ethersProvider.getSigner();
         const address = await signer.getAddress();
-        document.getElementById('walletStatus').textContent = `Connected: ${address.slice(0,6)}...${address.slice(-4)}`; // 改进显示
+        document.getElementById('walletStatus').textContent = `Connected: ${address.slice(0,6)}...${address.slice(-4)}`;
         console.log('Wallet connected:', address);
 
         const currentChain = await ethersProvider.getNetwork();
-        if (currentChain.chainId !== chainId) {
+        if (parseInt(currentChain.chainId) !== chainId) {
             try {
                 await walletProvider.request({
                     method: 'wallet_switchEthereumChain',
@@ -138,21 +142,33 @@ document.getElementById('connectWallet').onclick = async () => {
                 });
                 console.log('Switched to INK chain');
             } catch (switchError) {
-                if (switchError.code === 4902) {
-                    await walletProvider.request({
-                        method: 'wallet_addEthereumChain',
-                        params: [{
-                            chainId: `0x${chainId.toString(16)}`,
-                            chainName: 'Ink',
-                            nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
-                            rpcUrls: [rpcUrl],
-                            blockExplorerUrls: ['https://explorer.inkonchain.com']
-                        }],
-                    });
-                    console.log('Added INK chain');
+                console.error('Switch error:', switchError.message);
+                if (switchError.code === 4902 || switchError.code === -32603) { // Chain not added or error
+                    try {
+                        await walletProvider.request({
+                            method: 'wallet_addEthereumChain',
+                            params: [{
+                                chainId: `0x${chainId.toString(16)}`,
+                                chainName: 'Ink',
+                                nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
+                                rpcUrls: [rpcUrl],
+                                blockExplorerUrls: ['https://explorer.inkonchain.com']
+                            }],
+                        });
+                        console.log('Added INK chain');
+                        // Retry switch after add
+                        await walletProvider.request({
+                            method: 'wallet_switchEthereumChain',
+                            params: [{ chainId: `0x${chainId.toString(16)}` }],
+                        });
+                    } catch (addError) {
+                        console.error('Add chain error:', addError.message);
+                        alert('添加 INK 链失败，请手动在钱包添加网络');
+                    }
+                } else if (switchError.code === 4001) {
+                    alert('用户取消了链切换');
                 } else {
-                    console.error('Switch chain error:', switchError);
-                    alert('链切换失败，请手动添加 INK 链');
+                    alert('链切换失败，请检查钱包设置');
                 }
             }
         } else {
@@ -164,11 +180,13 @@ document.getElementById('connectWallet').onclick = async () => {
 
         updateBetButton();
         updateContractBalance();
-        // 移除 setupEventListeners() to avoid log fetching errors
-        // 使用 poll in addLog for status update
     } catch (err) {
         console.error('Connection error:', err.message);
-        alert('连接失败，请检查钱包和网络');
+        if (err.code === 4001) {
+            alert('用户取消了连接请求');
+        } else {
+            alert('连接失败，请检查钱包和网络设置');
+        }
     }
 };
 
@@ -192,8 +210,6 @@ document.getElementById('placeBet').onclick = async () => {
     }
 };
 
-// 移除 setupEventListeners
-
 async function addLog(blockNum, guess, amount) {
     const logs = getLogs();
     logs.push({ blockNum, guess, amount, status: 'Pending' });
@@ -204,18 +220,10 @@ async function addLog(blockNum, guess, amount) {
         try {
             const block = await provider.getBlock(blockNum);
             if (block && block.hash) {
-                // Poll for claimed status
-                const bet = await betContract.bets(await signer.getAddress(), blockNum);
-                if (bet.claimed) {
-                    clearInterval(interval);
-                    // Assume won if payout > 0, but since no payout in view, check amount (simplified)
-                    updateLogStatus(blockNum, 'Claimed (Check wallet for reward)');
-                } else {
-                    const tx = await betContract.claim(blockNum);
-                    await tx.wait();
-                    clearInterval(interval);
-                    updateLogStatus(blockNum, 'Claimed (Check wallet for reward)');
-                }
+                clearInterval(interval);
+                const tx = await betContract.claim(blockNum);
+                await tx.wait();
+                updateLogStatus(blockNum, 'Claimed (Check wallet for reward)');
             }
         } catch (err) {
             console.error('Add log error:', err.message);
@@ -228,7 +236,7 @@ function updateLogStatus(blockNum, status) {
     const log = logs.find(l => l.blockNum === blockNum);
     if (log) {
         log.status = status;
-        if (status.includes('Win')) log.highlight = true; // Adjust if needed
+        if (status.includes('Win')) log.highlight = true;
     }
     saveLogs(logs);
     renderLogs();
