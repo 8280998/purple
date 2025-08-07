@@ -1,8 +1,8 @@
 const tokenAddress = '0xd642b49d10cc6e1bc1c6945725667c35e0875f22';
-const contractAddress = '0x8EfED44e1Ed675C7aE460D2a71DAAf34F382a3BD'; //合约地址
+const contractAddress = '0x8efed44e1ed675c7ae460d2a71daaf34f382a3bd'; // 合约地址
 const rpcUrl = 'https://rpc-gel.inkonchain.com';
 const chainId = 57073;
-const decimals = 18; // Purple 代币小数位
+const decimals = 18;
 
 const provider = new ethers.JsonRpcProvider(rpcUrl);
 let signer, tokenContract, betContract;
@@ -66,12 +66,12 @@ async function updateContractBalance() {
         console.log('Updating balance with contract:', contractAddress);
         const tempToken = new ethers.Contract(tokenAddress, erc20Abi, provider);
         const balance = await tempToken.balanceOf(contractAddress);
-        const formattedBalance = ethers.formatUnits(balance, decimals); // 除以 10^18
+        const formattedBalance = ethers.formatUnits(balance, decimals);
         document.getElementById('contractBalance').textContent = `Purple pool: ${formattedBalance}`;
         console.log('Balance updated:', formattedBalance);
     } catch (err) {
         console.error('Error updating balance:', err.message);
-        document.getElementById('contractBalance').textContent = 'Purple pool: 查询失败 - 检查合约地址和网络';
+        document.getElementById('contractBalance').textContent = 'Purple pool: error';
     }
 }
 
@@ -100,7 +100,7 @@ async function updateBetButton() {
         try {
             const tempToken = new ethers.Contract(tokenAddress, erc20Abi, provider);
             const balance = await tempToken.balanceOf(contractAddress);
-            const required = selectedAmount * 12;
+            const required = BigInt(selectedAmount) * BigInt(12);
             if (balance < required) {
                 btn.disabled = true;
                 alert('合约余额不足以支付潜在奖励 (需 > 12x 下注额)');
@@ -195,13 +195,12 @@ document.getElementById('placeBet').onclick = async () => {
 
     try {
         const allowance = await tokenContract.allowance(await signer.getAddress(), contractAddress);
-        if (allowance < selectedAmount) {
-            // 只授权当前投注额
-            const approveTx = await tokenContract.approve(contractAddress, selectedAmount);
+        if (allowance < BigInt(selectedAmount)) {
+            const approveTx = await tokenContract.approve(contractAddress, BigInt(selectedAmount));
             await approveTx.wait();
         }
 
-        const tx = await betContract.placeBet(ethers.toUtf8Bytes(selectedGuess)[0], selectedAmount);
+        const tx = await betContract.placeBet(ethers.toUtf8Bytes(selectedGuess)[0], BigInt(selectedAmount));
         const receipt = await tx.wait();
 
         updateContractBalance();
@@ -228,41 +227,4 @@ async function addLog(blockNum, guess, amount) {
                 updateLogStatus(blockNum, 'Claimed (Check wallet for reward)');
             }
         } catch (err) {
-            console.error('Add log error:', err.message);
-        }
-    }, 2000);
-}
-
-function updateLogStatus(blockNum, status) {
-    const logs = getLogs();
-    const log = logs.find(l => l.blockNum === blockNum);
-    if (log) {
-        log.status = status;
-        if (status.includes('Win')) log.highlight = true;
-    }
-    saveLogs(logs);
-    renderLogs();
-}
-
-function getLogs() {
-    return JSON.parse(localStorage.getItem('betLogs') || '[]');
-}
-
-function saveLogs(logs) {
-    localStorage.setItem('betLogs', JSON.stringify(logs));
-}
-
-function renderLogs() {
-    const list = document.getElementById('logList');
-    list.innerHTML = '';
-    getLogs().forEach(log => {
-        const li = document.createElement('li');
-        li.textContent = `Block: ${log.blockNum}, Guess: ${log.guess}, Amount: ${log.amount}, Status: ${log.status}`;
-        if (log.highlight) li.classList.add('win');
-        list.appendChild(li);
-    });
-}
-
-function loadLogs() {
-    renderLogs();
-}
+            console
