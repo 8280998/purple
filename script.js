@@ -1,5 +1,5 @@
 const tokenAddress = '0xd642b49d10cc6e1bc1c6945725667c35e0875f22';
-const contractAddress = '0x7ffd4680bff22d42ab47164d092988339cedf29e'; // 合约地址
+const contractAddress = '0x7ffd4680bff22d42ab47164d092988339cedf29e'; //合约地址
 const rpcUrl = 'https://rpc-gel.inkonchain.com';
 const chainId = 57073;
 
@@ -7,6 +7,7 @@ const provider = new ethers.JsonRpcProvider(rpcUrl);
 let signer, tokenContract, betContract;
 let selectedGuess = '';
 let selectedAmount = 0;
+let selectedButton = null; // 用于高亮单选
 
 const erc20Abi = [
     'function approve(address spender, uint256 amount) external returns (bool)',
@@ -23,23 +24,6 @@ const betAbi = [
     'function getContractBalance() external view returns (uint256)'
 ];
 
-// RainbowKit & wagmi setup
-const config = wagmi.createConfig({
-    chains: [{
-        id: chainId,
-        name: 'Ink',
-        nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
-        rpcUrls: { default: { http: [rpcUrl] } },
-        blockExplorers: { default: { name: 'InkExplorer', url: 'https://explorer.inkonchain.com' } }
-    }],
-    transports: { [chainId]: wagmi.http() }
-});
-
-const rainbowConfig = rainbowkit.getDefaultConfig({
-    appName: 'INK Block Hash Bet',
-    chains: config.chains
-});
-
 document.addEventListener('DOMContentLoaded', () => {
     init();
 });
@@ -51,7 +35,10 @@ async function init() {
         const btn = document.createElement('button');
         btn.textContent = g;
         btn.onclick = () => {
+            if (selectedButton) selectedButton.classList.remove('selected');
             selectedGuess = g;
+            selectedButton = btn;
+            btn.classList.add('selected');
             updateBetButton();
         };
         guessButtons.appendChild(btn);
@@ -64,7 +51,7 @@ async function init() {
 async function updateContractBalance() {
     const tempContract = new ethers.Contract(contractAddress, betAbi, provider);
     const balance = await tempContract.getContractBalance();
-    document.getElementById('contractBalance').textContent = `合约 Purple 余额: ${balance.toString()}`;
+    document.getElementById('contractBalance').textContent = ` Purple pool: ${balance.toString()}`;
 }
 
 function setAmount(amount) {
@@ -99,14 +86,46 @@ async function updateBetButton() {
 }
 
 document.getElementById('connectWallet').onclick = async () => {
+    let walletProvider;
+    if (window.ethereum) {
+        walletProvider = window.ethereum; // MetaMask or compatible
+    } else if (window.okxwallet) {
+        walletProvider = window.okxwallet; // OKX
+    } else if (window.coinbaseWallet) {
+        walletProvider = window.coinbaseWallet; // Coinbase
+    } else {
+        alert('No supported wallet detected. Install MetaMask, OKX, or Coinbase Wallet extension.');
+        return;
+    }
+
     try {
-        const connector = await rainbowConfig.connect(); // 打开 RainbowKit 模态
-        const ethersProvider = new ethers.BrowserProvider(connector.provider);
+        // Request accounts (will popup permission)
+        await walletProvider.request({ method: 'eth_requestAccounts' });
+        const ethersProvider = new ethers.BrowserProvider(walletProvider);
         signer = await ethersProvider.getSigner();
         const address = await signer.getAddress();
         document.getElementById('walletStatus').textContent = `Connected: ${address.slice(0,6)}...`;
 
-        await ethersProvider.send('wallet_switchEthereumChain', [{ chainId: `0x${chainId.toString(16)}` }]);
+        // Add and switch to INK chain if needed
+        try {
+            await walletProvider.request({
+                method: 'wallet_switchEthereumChain',
+                params: [{ chainId: `0x${chainId.toString(16)}` }],
+            });
+        } catch (switchError) {
+            if (switchError.code === 4902) { // Chain not added
+                await walletProvider.request({
+                    method: 'wallet_addEthereumChain',
+                    params: [{
+                        chainId: `0x${chainId.toString(16)}`,
+                        chainName: 'Ink',
+                        nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
+                        rpcUrls: [rpcUrl],
+                        blockExplorerUrls: ['https://explorer.inkonchain.com']
+                    }],
+                });
+            }
+        }
 
         tokenContract = new ethers.Contract(tokenAddress, erc20Abi, signer);
         betContract = new ethers.Contract(contractAddress, betAbi, signer);
