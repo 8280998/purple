@@ -227,4 +227,41 @@ async function addLog(blockNum, guess, amount) {
                 updateLogStatus(blockNum, 'Claimed (Check wallet for reward)');
             }
         } catch (err) {
-            console
+            console.error('Add log error:', err.message);
+        }
+    }, 2000);
+}
+
+function updateLogStatus(blockNum, status) {
+    const logs = getLogs();
+    const log = logs.find(l => l.blockNum === blockNum);
+    if (log) {
+        log.status = status;
+        if (status.includes('Win')) log.highlight = true;
+    }
+    saveLogs(logs);
+    renderLogs();
+}
+
+function getLogs() {
+    return JSON.parse(localStorage.getItem('betLogs') || '[]');
+}
+
+function saveLogs(logs) {
+    localStorage.setItem('betLogs', JSON.stringify(logs));
+}
+
+function renderLogs() {
+    const list = document.getElementById('logList');
+    list.innerHTML = '';
+    getLogs().forEach(log => {
+        const li = document.createElement('li');
+        li.textContent = `Block: ${log.blockNum}, Guess: ${log.guess}, Amount: ${log.amount}, Status: ${log.status}`;
+        if (log.highlight) li.classList.add('win');
+        list.appendChild(li);
+    });
+}
+
+function loadLogs() {
+    renderLogs();
+}
