@@ -4,14 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>INK Block Hash Bet</title>
-    <!-- Google Fonts for futuristic look -->
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
-    <!-- Ethers.js -->
     <script src="https://cdn.ethers.io/lib/ethers-6.7.umd.min.js"></script>
-    <!-- RainbowKit & wagmi CDNs -->
-    <link rel="stylesheet" href="https://unpkg.com/@rainbow-me/rainbowkit@latest/dist/index.css">
-    <script src="https://unpkg.com/@wagmi/core@latest"></script>
-    <script src="https://unpkg.com/@rainbow-me/rainbowkit@latest/dist/index.js"></script>
     <style>
         body {
             font-family: 'Orbitron', sans-serif;
@@ -59,6 +53,10 @@
             height: 40px;
             font-size: 18px;
         }
+        #guessButtons button.selected {
+            background: linear-gradient(45deg, #ffcc00, #ff9900);
+            box-shadow: 0 0 10px #ffcc00;
+        }
         #logs {
             margin-top: 20px;
             border: 1px solid #00ff88;
@@ -75,7 +73,7 @@
     <h1>INK Block Hash Bet</h1>
     <button id="connectWallet">Connect Wallet</button>
     <p id="walletStatus"></p>
-    <p id="contractBalance">合约 Purple 余额: 加载中...</p>
+    <p id="contractBalance"> Purple pool: loading...</p>
 
     <div class="options">
         <h3>Choose Guess (0-9, a-f):</h3>
