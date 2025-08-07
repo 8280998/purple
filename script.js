@@ -1,5 +1,5 @@
 const tokenAddress = '0xd642b49d10cc6e1bc1c6945725667c35e0875f22';
-const contractAddress = '0x8efed44e1ed675c7ae460d2a71daaf34f382a3bd'; // 合约地址
+const contractAddress = '0x8EfED44e1Ed675C7aE460D2a71DAAf34F382a3BD'; // 合约地址
 const rpcUrl = 'https://rpc-gel.inkonchain.com';
 const chainId = 57073;
 const decimals = 18;
@@ -71,7 +71,7 @@ async function updateContractBalance() {
         console.log('Balance updated:', formattedBalance);
     } catch (err) {
         console.error('Error updating balance:', err.message);
-        document.getElementById('contractBalance').textContent = 'Purple pool: error';
+        document.getElementById('contractBalance').textContent = 'Purple pool: 查询失败 - 检查合约地址和网络';
     }
 }
 
@@ -83,9 +83,14 @@ function setAmount(amount) {
 }
 
 document.getElementById('amountInput').addEventListener('input', (e) => {
-    const val = parseInt(e.target.value);
+    let val = parseInt(e.target.value);
+    if (val < 1) {
+        val = 1;
+        e.target.value = 1;
+    }
     if (val > 10000) {
         alert('Maximum bet is 10,000 tokens');
+        val = 10000;
         e.target.value = 10000;
     }
     selectedAmount = val || 0;
