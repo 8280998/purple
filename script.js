@@ -1,5 +1,5 @@
 const tokenAddress = '0xd642b49d10cc6e1bc1c6945725667c35e0875f22';
-const contractAddress = '0x8EfED44e1Ed675C7aE460D2a71DAAf34F382a3BD';
+const contractAddress = '0x8efed44e1ed675c7ae460d2a71daaf34f382a3bd';
 const rpcUrl = 'https://rpc-gel.inkonchain.com';
 const chainId = 57073;
 const decimals = 18;
