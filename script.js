@@ -1,5 +1,5 @@
-const tokenAddress = '0xd642b49d10cc6e1bc1c6945725667c35e0875f22';  //purple合约地址
-const contractAddress = '0x7ffd4680bff22d42ab47164d092988339cedf29e'; // 部署地址
+const tokenAddress = '0xd642b49d10cc6e1bc1c6945725667c35e0875f22';
+const contractAddress = '0x7ffd4680bff22d42ab47164d092988339cedf29e'; // 替换为您的代理地址
 const rpcUrl = 'https://rpc-gel.inkonchain.com';
 const chainId = 57073;
 
@@ -23,6 +23,27 @@ const betAbi = [
     'function getContractBalance() external view returns (uint256)'
 ];
 
+// RainbowKit & wagmi setup
+const config = wagmi.createConfig({
+    chains: [{
+        id: chainId,
+        name: 'Ink',
+        nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
+        rpcUrls: { default: { http: [rpcUrl] } },
+        blockExplorers: { default: { name: 'InkExplorer', url: 'https://explorer.inkonchain.com' } }
+    }],
+    transports: { [chainId]: wagmi.http() }
+});
+
+const rainbowConfig = rainbowkit.getDefaultConfig({
+    appName: 'INK Block Hash Bet',
+    chains: config.chains
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    init();
+});
+
 async function init() {
     const guesses = '0123456789abcdef'.split('');
     const guessButtons = document.getElementById('guessButtons');
@@ -37,15 +58,13 @@ async function init() {
     });
 
     loadLogs();
-    // 初始加载合约余额
     updateContractBalance();
 }
 
 async function updateContractBalance() {
-    if (betContract) {
-        const balance = await betContract.getContractBalance();
-        document.getElementById('contractBalance').textContent = `合约 Purple 余额: ${balance.toString()}`;
-    }
+    const tempContract = new ethers.Contract(contractAddress, betAbi, provider);
+    const balance = await tempContract.getContractBalance();
+    document.getElementById('contractBalance').textContent = `合约 Purple 余额: ${balance.toString()}`;
 }
 
 function setAmount(amount) {
@@ -68,9 +87,9 @@ async function updateBetButton() {
     const btn = document.getElementById('placeBet');
     btn.disabled = !signer || !selectedGuess || selectedAmount <= 0;
 
-    // 检查合约余额是否足够
-    if (betContract && selectedAmount > 0) {
-        const balance = await betContract.getContractBalance();
+    if (selectedAmount > 0) {
+        const tempContract = new ethers.Contract(contractAddress, betAbi, provider);
+        const balance = await tempContract.getContractBalance();
         const required = selectedAmount * 12;
         if (balance < required) {
             btn.disabled = true;
@@ -80,33 +99,24 @@ async function updateBetButton() {
 }
 
 document.getElementById('connectWallet').onclick = async () => {
-    if (!window.ethereum) return alert('Install MetaMask');
-
     try {
-        await ethereum.request({
-            method: 'wallet_addEthereumChain',
-            params: [{
-                chainId: `0x${chainId.toString(16)}`,
-                chainName: 'Ink',
-                nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
-                rpcUrls: [rpcUrl],
-                blockExplorerUrls: ['https://explorer.inkonchain.com']
-            }]
-        });
-
-        const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
-        signer = await (new ethers.BrowserProvider(ethereum)).getSigner();
+        const connector = await rainbowConfig.connect(); // 打开 RainbowKit 模态
+        const ethersProvider = new ethers.BrowserProvider(connector.provider);
+        signer = await ethersProvider.getSigner();
         const address = await signer.getAddress();
         document.getElementById('walletStatus').textContent = `Connected: ${address.slice(0,6)}...`;
+
+        await ethersProvider.send('wallet_switchEthereumChain', [{ chainId: `0x${chainId.toString(16)}` }]);
 
         tokenContract = new ethers.Contract(tokenAddress, erc20Abi, signer);
         betContract = new ethers.Contract(contractAddress, betAbi, signer);
 
         updateBetButton();
-        updateContractBalance(); // 连接后更新余额
+        updateContractBalance();
         setupEventListeners();
     } catch (err) {
         console.error(err);
+        alert('连接失败，请检查钱包和网络');
     }
 };
 
@@ -122,10 +132,8 @@ document.getElementById('placeBet').onclick = async () => {
         const tx = await betContract.placeBet(ethers.toUtf8Bytes(selectedGuess)[0], selectedAmount);
         const receipt = await tx.wait();
 
-        // 下注后更新余额
         updateContractBalance();
 
-        // 存储日志并开始自动 claim 轮询
         addLog(receipt.blockNumber, selectedGuess, selectedAmount);
     } catch (err) {
         console.error(err);
@@ -142,7 +150,7 @@ function setupEventListeners() {
     betContract.on('Claimed', (user, blockNum, won, payout) => {
         if (user.toLowerCase() === (signer.address.toLowerCase())) {
             updateLogStatus(blockNum, won ? 'Win (Highlighted)' : 'Loss');
-            updateContractBalance(); // 发放后更新余额
+            updateContractBalance();
         }
     });
 }
@@ -153,20 +161,18 @@ async function addLog(blockNum, guess, amount) {
     saveLogs(logs);
     renderLogs();
 
-    // 轮询 blockhash 并自动 claim (实现自动发放)
     const interval = setInterval(async () => {
         try {
             const block = await provider.getBlock(blockNum);
             if (block && block.hash) {
                 clearInterval(interval);
-                // 自动调用 claim
                 const tx = await betContract.claim(blockNum);
                 await tx.wait();
             }
         } catch (err) {
             console.error(err);
         }
-    }, 2000); // 每 2 秒检查一次（INK 块速 ~1s）
+    }, 2000);
 }
 
 function updateLogStatus(blockNum, status) {
@@ -202,5 +208,3 @@ function renderLogs() {
 function loadLogs() {
     renderLogs();
 }
-
-init();
