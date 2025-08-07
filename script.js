@@ -1,5 +1,5 @@
 const tokenAddress = '0xd642b49d10cc6e1bc1c6945725667c35e0875f22';  //purple合约地址
-const contractAddress = 'CONTRACT_ADDRESS'; // 部署地址
+const contractAddress = '0x7ffd4680bff22d42ab47164d092988339cedf29e'; // 部署地址
 const rpcUrl = 'https://rpc-gel.inkonchain.com';
 const chainId = 57073;
 
