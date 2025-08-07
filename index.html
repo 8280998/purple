@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>INK Block Hash Bet</title>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
-    <!-- Updated ethers.js CDN from jsDelivr -->
     <script src="https://cdn.jsdelivr.net/npm/ethers@6/dist/ethers.umd.min.js"></script>
     <style>
         body {
@@ -74,7 +73,7 @@
     <h1>INK Block Hash Bet</h1>
     <button id="connectWallet">Connect Wallet</button>
     <p id="walletStatus"></p>
-    <p id="contractBalance"> Purple pool: loading...</p>
+    <p id="contractBalance">purple pool: loading...</p>
 
     <div class="options">
         <h3>Choose Guess (0-9, a-f):</h3>
@@ -83,9 +82,9 @@
 
     <div class="options">
         <h3>Bet Amount:</h3>
-        <button onclick="setAmount(100)">100</button>
-        <button onclick="setAmount(500)">500</button>
-        <button onclick="setAmount(1000)">1000</button>
+        <button id="bet100">100</button>
+        <button id="bet500">500</button>
+        <button id="bet1000">1000</button>
         <input type="number" id="amountInput" placeholder="Custom" min="1" max="10000">
     </div>
 
