@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>INK Block Hash Bet</title>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.ethers.io/lib/ethers-6.7.umd.min.js"></script>
+    <!-- Updated ethers.js CDN from jsDelivr -->
+    <script src="https://cdn.jsdelivr.net/npm/ethers@6/dist/ethers.umd.min.js"></script>
     <style>
         body {
             font-family: 'Orbitron', sans-serif;
@@ -73,7 +74,7 @@
     <h1>INK Block Hash Bet</h1>
     <button id="connectWallet">Connect Wallet</button>
     <p id="walletStatus"></p>
-    <p id="contractBalance">Purple pool: loading...</p>
+    <p id="contractBalance"> Purple pool: loading...</p>
 
     <div class="options">
         <h3>Choose Guess (0-9, a-f):</h3>
