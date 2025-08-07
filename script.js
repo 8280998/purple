@@ -1,7 +1,8 @@
 const tokenAddress = '0xd642b49d10cc6e1bc1c6945725667c35e0875f22';
-const contractAddress = '0x8efed44e1ed675c7ae460d2a71daaf34f382a3bd'; // 
+const contractAddress = '0x8EfED44e1Ed675C7aE460D2a71DAAf34F382a3BD'; //合约地址
 const rpcUrl = 'https://rpc-gel.inkonchain.com';
 const chainId = 57073;
+const decimals = 18; // Purple 代币小数位
 
 const provider = new ethers.JsonRpcProvider(rpcUrl);
 let signer, tokenContract, betContract;
@@ -28,7 +29,6 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM loaded, initializing...');
     init();
 
-    // 修复 100/500/1000 按钮
     document.getElementById('bet100').onclick = () => setAmount(100);
     document.getElementById('bet500').onclick = () => setAmount(500);
     document.getElementById('bet1000').onclick = () => setAmount(1000);
@@ -66,11 +66,12 @@ async function updateContractBalance() {
         console.log('Updating balance with contract:', contractAddress);
         const tempToken = new ethers.Contract(tokenAddress, erc20Abi, provider);
         const balance = await tempToken.balanceOf(contractAddress);
-        document.getElementById('contractBalance').textContent = ` Purple pool: ${balance.toString()}`;
-        console.log('Balance updated:', balance.toString());
+        const formattedBalance = ethers.formatUnits(balance, decimals); // 除以 10^18
+        document.getElementById('contractBalance').textContent = `Purple pool: ${formattedBalance}`;
+        console.log('Balance updated:', formattedBalance);
     } catch (err) {
         console.error('Error updating balance:', err.message);
-        document.getElementById('contractBalance').textContent = 'Purple pool: error';
+        document.getElementById('contractBalance').textContent = 'Purple pool: 查询失败 - 检查合约地址和网络';
     }
 }
 
@@ -143,7 +144,7 @@ document.getElementById('connectWallet').onclick = async () => {
                 console.log('Switched to INK chain');
             } catch (switchError) {
                 console.error('Switch error:', switchError.message);
-                if (switchError.code === 4902 || switchError.code === -32603) { // Chain not added or error
+                if (switchError.code === 4902 || switchError.code === -32603) {
                     try {
                         await walletProvider.request({
                             method: 'wallet_addEthereumChain',
@@ -156,7 +157,6 @@ document.getElementById('connectWallet').onclick = async () => {
                             }],
                         });
                         console.log('Added INK chain');
-                        // Retry switch after add
                         await walletProvider.request({
                             method: 'wallet_switchEthereumChain',
                             params: [{ chainId: `0x${chainId.toString(16)}` }],
@@ -196,7 +196,9 @@ document.getElementById('placeBet').onclick = async () => {
     try {
         const allowance = await tokenContract.allowance(await signer.getAddress(), contractAddress);
         if (allowance < selectedAmount) {
-            await (await tokenContract.approve(contractAddress, ethers.MaxUint256)).wait();
+            // 只授权当前投注额
+            const approveTx = await tokenContract.approve(contractAddress, selectedAmount);
+            await approveTx.wait();
         }
 
         const tx = await betContract.placeBet(ethers.toUtf8Bytes(selectedGuess)[0], selectedAmount);
