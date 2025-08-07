@@ -1,5 +1,5 @@
 const tokenAddress = '0xd642b49d10cc6e1bc1c6945725667c35e0875f22';
-const contractAddress = '0x7ffd4680bff22d42ab47164d092988339cedf29e';
+const contractAddress = '0x7ffd4680bff22d42ab47164d092988339cedf29e'; // 合约地址
 const rpcUrl = 'https://rpc-gel.inkonchain.com';
 const chainId = 57073;
 
@@ -33,6 +33,10 @@ async function init() {
     console.log('Init started');
     const guesses = '0123456789abcdef'.split('');
     const guessButtons = document.getElementById('guessButtons');
+    if (!guessButtons) {
+        console.error('guessButtons element not found');
+        return;
+    }
     guesses.forEach(g => {
         const btn = document.createElement('button');
         btn.textContent = g;
@@ -42,10 +46,11 @@ async function init() {
             selectedButton = btn;
             btn.classList.add('selected');
             updateBetButton();
+            console.log('Guess selected:', g);
         };
         guessButtons.appendChild(btn);
     });
-    console.log('Guess buttons created');
+    console.log('Guess buttons created:', guesses.length);
 
     loadLogs();
     updateContractBalance().catch(err => console.error('Balance update error:', err));
@@ -53,14 +58,14 @@ async function init() {
 
 async function updateContractBalance() {
     try {
-        console.log('Updating balance...');
+        console.log('Updating balance with contract:', contractAddress);
         const tempContract = new ethers.Contract(contractAddress, betAbi, provider);
         const balance = await tempContract.getContractBalance();
         document.getElementById('contractBalance').textContent = `Purple pool: ${balance.toString()}`;
         console.log('Balance updated:', balance.toString());
     } catch (err) {
-        console.error('Error updating balance:', err);
-        document.getElementById('contractBalance').textContent = ' Purple pool: error';
+        console.error('Error updating balance:', err.message);
+        document.getElementById('contractBalance').textContent = 'Purple pool: error';
     }
 }
 
@@ -104,7 +109,7 @@ document.getElementById('connectWallet').onclick = async () => {
     let walletProvider;
     if (window.ethereum) {
         walletProvider = window.ethereum;
-        console.log('MetaMask detected');
+        console.log('MetaMask or compatible detected');
     } else if (window.okxwallet) {
         walletProvider = window.okxwallet;
         console.log('OKX detected');
@@ -130,6 +135,7 @@ document.getElementById('connectWallet').onclick = async () => {
                 method: 'wallet_switchEthereumChain',
                 params: [{ chainId: `0x${chainId.toString(16)}` }],
             });
+            console.log('Switched to INK chain');
         } catch (switchError) {
             if (switchError.code === 4902) {
                 await walletProvider.request({
@@ -142,6 +148,7 @@ document.getElementById('connectWallet').onclick = async () => {
                         blockExplorerUrls: ['https://explorer.inkonchain.com']
                     }],
                 });
+                console.log('Added INK chain');
             } else {
                 console.error('Switch chain error:', switchError);
             }
@@ -154,12 +161,12 @@ document.getElementById('connectWallet').onclick = async () => {
         updateContractBalance();
         setupEventListeners();
     } catch (err) {
-        console.error('Connection error:', err);
+        console.error('Connection error:', err.message);
         alert('连接失败，请检查钱包和网络');
     }
 };
 
-// 其余函数不变: placeBet, setupEventListeners, addLog, updateLogStatus, getLogs, saveLogs, renderLogs, loadLogs
+// 其余函数不变
 document.getElementById('placeBet').onclick = async () => {
     if (!selectedGuess || selectedAmount <= 0) return;
 
