@@ -99,15 +99,14 @@ const ERC20_ABI = [
 ];
 
 // Hardcoded values
-const RPC_URL = "https://testnet-rpc.monad.xyz";
-const CHAIN_ID = 10143;
-const CONTRACT_ADDRESS = "0xd081Ae7bA1Ee5e872690F2cC26dfa588531eA628";
-const TOKEN_ADDRESS = "0xF7C90D79a1c2EA9c9028704E1Bd1FCC3619b5a37";
-const CLAIM_CONTRACT_ADDRESS = "0xfcBA9b0ABc504bCBb89F0771833c57F17FDbdd42";
-const EXPLORER_URL = "https://testnet.monadexplorer.com";
+const RPC_URL = "https://rpc-qnd.inkonchain.com";
+const CHAIN_ID = 57073;
+const CONTRACT_ADDRESS = "0xB500c062dE1445B9E2A08B71968DD9AC34eA6477";
+const TOKEN_ADDRESS = "0xD642B49d10cc6e1BC1c6945725667c35e0875f22";
+const EXPLORER_URL = "https://explorer.inkonchain.com/";
 const COOLDOWN = 1; // seconds
 const BLOCK_WAIT_TIME = 2; // seconds
-const MONAD_CHAIN_ID_HEX = "0x2797"; // 10143 in hex
+const INK_CHAIN_ID_HEX = "0xDEF1"; // 57073 in hex
 
 const CLAIM_ABI = [
   {
@@ -139,7 +138,7 @@ const App = () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        domain: 'monadbettingapp',
+        domain: 'purplebettingapp',
       })
     })
       .then(res => res.json())
@@ -194,24 +193,24 @@ const App = () => {
 
       if (Number(network.chainId) !== CHAIN_ID) {
         if (isCoinbase) {
-          addLog({type: 'simple', message: "Coinbase Wallet detected: Please add Monad Testnet manually in your wallet settings."});
-          addLog({type: 'simple', message: "Network details: Chain ID: 10143, RPC: https://testnet-rpc.monad.xyz, Symbol: MON, Explorer: https://testnet.monadexplorer.com"});
+          addLog({type: 'simple', message: "Coinbase Wallet detected: Please add ink manually in your wallet settings."});
+          addLog({type: 'simple', message: "Network details: Chain ID: 57073, RPC: https://explorer.inkonchain.com, Symbol: INK, Explorer: https://explorer.inkonchain.com"});
         } else {
           try {
             await ethereumProvider.request({
               method: 'wallet_switchEthereumChain',
-              params: [{ chainId: MONAD_CHAIN_ID_HEX }],
+              params: [{ chainId: INK_CHAIN_ID_HEX }],
             });
           } catch (switchError) {
             if (switchError.code === 4902) {
               await ethereumProvider.request({
                 method: 'wallet_addEthereumChain',
                 params: [{
-                  chainId: MONAD_CHAIN_ID_HEX,
-                  chainName: 'Monad Testnet',
+                  chainId: INK_CHAIN_ID_HEX,
+                  chainName: 'INK',
                   rpcUrls: [RPC_URL],
-                  nativeCurrency: { name: 'MON', symbol: 'MON', decimals: 18 },
-                  blockExplorerUrls: ['https://testnet.monadexplorer.com/'],
+                  nativeCurrency: { name: 'INK', symbol: 'INK', decimals: 18 },
+                  blockExplorerUrls: ['https://explorer.inkonchain.com/'],
                 }],
               });
             } else {
@@ -222,7 +221,7 @@ const App = () => {
 
           const updatedNetwork = await newProvider.getNetwork();
           if (Number(updatedNetwork.chainId) !== CHAIN_ID) {
-            addLog({type: 'simple', message: "Failed to switch to Monad Testnet. Please switch manually in your wallet."});
+            addLog({type: 'simple', message: "Failed to switch to INK. Please switch manually in your wallet."});
             return;
           }
         }
@@ -375,7 +374,7 @@ const App = () => {
   return (
     <div className="app-container">
       <header className="app-header">
-        <h1>Monad Betting Game</h1>
+        <h1>Purple Betting Game</h1>
         <p className="subtitle">Bet on the blockchain – Win big or go home!</p>
         <p className="visitor-count">Welcome, you are the {visitorCount}th visitor</p>
       </header>
@@ -393,17 +392,9 @@ const App = () => {
       {account && (
         <div className="account-info">
           <p>Account: {shortenHash(account)}</p>
-          <p>Balance: {balance} GTK</p>
+          <p>Balance: {balance} Purple</p>
         </div>
       )}
-      <div className="button-group">
-        <button className="instructions-btn" onClick={() => setModalIsOpen(true)}>
-          Instructions
-        </button>
-        <button className="claim-btn" onClick={claimTokens}>
-          Claim Tokens
-        </button>
-      </div>
       <Modal
         isOpen={modalIsOpen}
         onRequestClose={() => setModalIsOpen(false)}
@@ -446,7 +437,7 @@ const App = () => {
         )}
         <div className="input-row">
           <div className="input-group">
-            <label>Bet Amount (GTK):</label>
+            <label>Bet Amount (Purple):</label>
             <input
               type="number"
               value={betAmount}
@@ -528,7 +519,7 @@ const App = () => {
                   {log.won && (
                     <>
                       <br />
-                      Send {log.reward} token tx: 
+                      Send {log.reward} Purple tx: 
                       <a href={`${EXPLORER_URL}/tx/${log.txHash}`} target="_blank" rel="noopener noreferrer" className="tx-link">
                         {shortenHash(log.txHash)}
                       </a>
