@@ -108,16 +108,6 @@ const COOLDOWN = 1; // seconds
 const BLOCK_WAIT_TIME = 2; // seconds
 const INK_CHAIN_ID_HEX = "0xDEF1"; // 57073 in hex
 
-const CLAIM_ABI = [
-  {
-    "inputs": [],
-    "name": "claim",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  }
-];
-
 const App = () => {
   const [betAmount, setBetAmount] = useState(100.0);
   const [numBets, setNumBets] = useState(1);
@@ -234,23 +224,6 @@ const App = () => {
       addLog({type: 'simple', message: `Connected with ${walletName}: ${accounts[0]}`});
     } catch (error) {
       addLog({type: 'simple', message: `Connection failed: ${error.message}`});
-    }
-  };
-
-  const claimTokens = async () => {
-    if (!signer || !account) {
-      addLog({type: 'simple', message: "Connect wallet first."});
-      return;
-    }
-    try {
-      const claimContract = new ethers.Contract(CLAIM_CONTRACT_ADDRESS, CLAIM_ABI, signer);
-      const tx = await claimContract.claim();
-      addLog({type: 'tx', message: `Claiming tokens... Tx: `, txHash: tx.hash});
-      const receipt = await tx.wait();
-      addLog({type: 'simple', message: `Claim confirmed! Block: ${receipt.blockNumber}`});
-      updateBalance();
-    } catch (error) {
-      addLog({type: 'simple', message: `Claim failed: ${error.message}`});
     }
   };
 
