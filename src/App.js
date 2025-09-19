@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Modal from 'react-modal';
 import { ethers } from 'ethers';
 import './App.css'; // Import the CSS for styling
@@ -108,6 +108,7 @@ const COOLDOWN = 1; // seconds
 const BLOCK_WAIT_TIME = 2; // seconds
 const INK_CHAIN_ID_HEX = "0xDEF1"; // 57073 in hex
 
+
 const App = () => {
   const [betAmount, setBetAmount] = useState(100.0);
   const [numBets, setNumBets] = useState(1);
@@ -117,9 +118,10 @@ const App = () => {
   const [signer, setSigner] = useState(null);
   const [account, setAccount] = useState(null);
   const [balance, setBalance] = useState(0);
+  const [contractBalance, setContractBalance] = useState(0);
   const [logs, setLogs] = useState([]);
   const [isBetting, setIsBetting] = useState(false);
-  const [stopRequested, setStopRequested] = useState(false);
+  const stopRequestedRef = useRef(false);
   const [modalIsOpen, setModalIsOpen] = useState(false);
   const [visitorCount, setVisitorCount] = useState('?');
 
@@ -128,7 +130,7 @@ const App = () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        domain: 'purplebettingapp',
+        domain: 'purplebet.vercel.app',
       })
     })
       .then(res => res.json())
@@ -139,8 +141,49 @@ const App = () => {
   useEffect(() => {
     if (account && provider) {
       updateBalance();
+      updateContractBalance();
     }
   }, [account, provider]);
+
+  useEffect(() => {
+    if (!provider) return;
+
+    const handleChainChanged = async (chainId) => {
+      const newChainId = parseInt(chainId, 16); // Hex to decimal
+      if (newChainId === CHAIN_ID) {
+        addLog({type: 'simple', message: "Network switched to INK."});
+        if (account) {
+          updateBalance();
+          updateContractBalance();
+        }
+      } else {
+        addLog({type: 'simple', message: "Switched to a different network. Please switch back to INK."});
+      }
+    };
+
+    const handleAccountsChanged = (accounts) => {
+      if (accounts.length > 0) {
+        setAccount(accounts[0]);
+        updateBalance();
+        updateContractBalance();
+      } else {
+        setAccount(null);
+        setSigner(null);
+        setProvider(null);
+        setBalance(0);
+        setContractBalance(0);
+        addLog({type: 'simple', message: "Wallet disconnected."});
+      }
+    };
+
+    provider.provider.on('chainChanged', handleChainChanged);
+    provider.provider.on('accountsChanged', handleAccountsChanged);
+
+    return () => {
+      provider.provider.removeListener('chainChanged', handleChainChanged);
+      provider.provider.removeListener('accountsChanged', handleAccountsChanged);
+    };
+  }, [provider, account]);
 
   const addLog = (logEntry) => {
     setLogs(prev => [...prev, logEntry]);
@@ -152,7 +195,7 @@ const App = () => {
 
     if (walletType === 'metamask') {
       if (!window.ethereum || !window.ethereum.isMetaMask) {
-        addLog({type: 'simple', message: "MetaMask not detected. Please install or enable it."});
+        addLog({type: 'simple', message: "MetaMask not detected. Please install or enable it. If multiple wallets are installed, try disabling others temporarily."});
         return;
       }
       ethereumProvider = window.ethereum;
@@ -179,41 +222,56 @@ const App = () => {
       const newProvider = new ethers.BrowserProvider(ethereumProvider);
       const network = await newProvider.getNetwork();
 
-      const isCoinbase = walletType === 'coinbase';
-
       if (Number(network.chainId) !== CHAIN_ID) {
-        if (isCoinbase) {
-          addLog({type: 'simple', message: "Coinbase Wallet detected: Please add ink manually in your wallet settings."});
-          addLog({type: 'simple', message: "Network details: Chain ID: 57073, RPC: https://explorer.inkonchain.com, Symbol: INK, Explorer: https://explorer.inkonchain.com"});
-        } else {
-          try {
-            await ethereumProvider.request({
-              method: 'wallet_switchEthereumChain',
-              params: [{ chainId: INK_CHAIN_ID_HEX }],
-            });
-          } catch (switchError) {
-            if (switchError.code === 4902) {
+        addLog({type: 'simple', message: `Detected wallet: ${walletName}. Switching to INK...`});
+        let switchSuccess = false;
+        try {
+          await ethereumProvider.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: INK_CHAIN_ID_HEX }],
+          });
+          switchSuccess = true;
+        } catch (switchError) {
+          if (switchError.code === 4902) {
+            try {
               await ethereumProvider.request({
                 method: 'wallet_addEthereumChain',
                 params: [{
                   chainId: INK_CHAIN_ID_HEX,
                   chainName: 'INK',
                   rpcUrls: [RPC_URL],
-                  nativeCurrency: { name: 'INK', symbol: 'INK', decimals: 18 },
+                  nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
                   blockExplorerUrls: ['https://explorer.inkonchain.com/'],
                 }],
               });
-            } else {
-              addLog({type: 'simple', message: `Chain switch failed: ${switchError.message}`});
-              return;
+              addLog({type: 'simple', message: `Chain added to ${walletName}. Now switching...`});
+              // After adding, try switching again
+              await ethereumProvider.request({
+                method: 'wallet_switchEthereumChain',
+                params: [{ chainId: INK_CHAIN_ID_HEX }],
+              });
+              switchSuccess = true;
+            } catch (addError) {
+              addLog({type: 'simple', message: `Failed to add chain to ${walletName}: ${addError.message}`});
             }
+          } else {
+            addLog({type: 'simple', message: `Switch failed for ${walletName}: ${switchError.message}`});
           }
+        }
 
-          const updatedNetwork = await newProvider.getNetwork();
-          if (Number(updatedNetwork.chainId) !== CHAIN_ID) {
-            addLog({type: 'simple', message: "Failed to switch to INK. Please switch manually in your wallet."});
-            return;
-          }
+        if (switchSuccess) {
+          // Add a longer delay to allow the wallet to fully update after switch
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+
+        const updatedNetwork = await newProvider.getNetwork();
+        if (Number(updatedNetwork.chainId) !== CHAIN_ID) {
+          addLog({type: 'simple', message: `Failed to switch to Base in ${walletName}. Please switch manually.`});
+          addLog({type: 'simple', message: "Network details: Chain ID: 57073, RPC: https://rpc-qnd.inkonchain.com, Symbol: ETH, Explorer: https://explorer.inkonchain.com"});
+          // Proceed with connection but warn
+          addLog({type: 'simple', message: "Connected anyway. Please switch network manually in wallet to use the app fully."});
+        } else {
+          addLog({type: 'simple', message: "Successfully switched to INK!"});
         }
       }
 
@@ -222,6 +280,14 @@ const App = () => {
       setSigner(newSigner);
       setAccount(accounts[0]);
       addLog({type: 'simple', message: `Connected with ${walletName}: ${accounts[0]}`});
+
+      // Force balance update after state settles
+      setTimeout(() => {
+        if (provider && account) {
+          updateBalance();
+          updateContractBalance();
+        }
+      }, 1000);
     } catch (error) {
       addLog({type: 'simple', message: `Connection failed: ${error.message}`});
     }
@@ -237,14 +303,27 @@ const App = () => {
     }
   };
 
+  const updateContractBalance = async () => {
+    try {
+      const tokenContract = new ethers.Contract(TOKEN_ADDRESS, ERC20_ABI, provider);
+      const bal = await tokenContract.balanceOf(CONTRACT_ADDRESS);
+      setContractBalance(ethers.formatEther(bal));
+    } catch (error) {
+      addLog({type: 'simple', message: `Failed to fetch contract balance: ${error.message}`});
+    }
+  };
+
   const approveToken = async (contractAddr, tokenContract) => {
     try {
       const allowance = await tokenContract.allowance(account, contractAddr);
       const required = ethers.parseEther(betAmount.toString()) * BigInt(numBets);
       if (allowance < required) {
-        const tx = await tokenContract.approve(contractAddr, ethers.MaxUint256);
+
+        const estimatedGas = await tokenContract.approve.estimateGas(contractAddr, ethers.MaxUint256);
+        const gasLimit = estimatedGas * 120n / 100n;
+        const tx = await tokenContract.approve(contractAddr, ethers.MaxUint256, { gasLimit });
         addLog({type: 'tx', message: `Approving tokens... Tx: `, txHash: tx.hash});
-        await tx.wait();
+        await tx.wait(2);
         addLog({type: 'simple', message: `Approval confirmed.`});
       }
     } catch (error) {
@@ -253,10 +332,30 @@ const App = () => {
     }
   };
 
-  const placeBet = async (contract, currentGuess) => {
+  const betIteration = async (contract, tokenContract, i) => {
+    if (stopRequestedRef.current) {
+      addLog({type: 'simple', message: 'Betting stopped by user.'});
+      return false;
+    }
+
+    const currentGuess = mode === '1' ? guess : '0123456789abcdef'.charAt(Math.floor(Math.random() * 16));
+    addLog({type: 'simple', message: `Attempting bet ${i+1}/${numBets} with guess ${currentGuess}`});
+    const { betId } = await placeBet(contract, currentGuess);
+    await new Promise(resolve => setTimeout(resolve, BLOCK_WAIT_TIME * 1000));
+    await resolveBet(contract, betId);
+    await new Promise(resolve => setTimeout(resolve, COOLDOWN * 1000));
+    updateBalance();
+    updateContractBalance();
+    return true;
+  };
+
+  const placeBet = async (contract, currentGuess, retryCount = 0) => {
     try {
       const amountWei = ethers.parseEther(betAmount.toString());
-      const tx = await contract.placeBet(currentGuess, amountWei);
+
+      const estimatedGas = await contract.placeBet.estimateGas(currentGuess, amountWei);
+      const gasLimit = estimatedGas * 120n / 100n;
+      const tx = await contract.placeBet(currentGuess, amountWei, { gasLimit });
       addLog({type: 'tx', message: `Placing bet with guess ${currentGuess}... Tx: `, txHash: tx.hash});
       const receipt = await tx.wait();
       const iface = new ethers.Interface(CONTRACT_ABI);
@@ -274,29 +373,54 @@ const App = () => {
       addLog({type: 'betPlaced', betId: betId.toString(), blockNumber: receipt.blockNumber});
       return { receipt, txHash: tx.hash, betId: betId.toString() };
     } catch (error) {
+      if (error.message.includes('Insufficient allowance') && retryCount < 1) {
+        addLog({type: 'simple', message: `Allowance sync delay detected, retrying bet...`});
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        return placeBet(contract, currentGuess, retryCount + 1);
+      }
       addLog({type: 'simple', message: `Place bet failed: ${error.message}`});
       throw error;
     }
   };
 
-  const resolveBet = async (contract, betId) => {
+  const resolveBet = async (contract, betId, retryCount = 0) => {
     try {
-      const tx = await contract.resolveBet(BigInt(betId));
-      const receipt = await tx.wait();
       const bet = await contract.getBet(BigInt(betId));
-      const won = bet[4];
-      const reward = ethers.formatEther(bet[5]);
-      const blockNumber = bet[6].toString();
+      const betBlock = Number(bet[6]);  // bet blockNumber
+      const currentBlock = await provider.getBlockNumber();
+      const blocksDiff = currentBlock - betBlock;
+      addLog({type: 'simple', message: `Checking blocks: Bet at ${betBlock}, Current ${currentBlock}, Diff: ${blocksDiff}`});
+
+      if (blocksDiff < 2) {
+        const waitTime = (2 - blocksDiff) * 2 * 1000;
+        addLog({type: 'simple', message: `Waiting extra ${waitTime / 1000}s for 2 blocks confirmation...`});
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
+
+      const estimatedGas = await contract.resolveBet.estimateGas(BigInt(betId));
+      const gasLimit = estimatedGas * 120n / 100n;
+      const tx = await contract.resolveBet(BigInt(betId), { gasLimit });
+      const receipt = await tx.wait();
+      const resolvedBet = await contract.getBet(BigInt(betId));
+      const won = resolvedBet[4];
+      const reward = ethers.formatEther(resolvedBet[5]);
+      const blockNumber = resolvedBet[6].toString();
       const block = await provider.getBlock(Number(blockNumber));
-      const targetByte = String.fromCharCode(bet[3]);
+      const targetByte = String.fromCharCode(resolvedBet[3]);
       addLog({type: 'blockInfo', blockNumber, blockHash: block.hash, targetByte});
       if (won) {
         addLog({type: 'result', won: true, reward, txHash: tx.hash, betId});
       } else {
         addLog({type: 'result', won: false, betId});
       }
-      return { bet, txHash: tx.hash };
+      return { bet: resolvedBet, txHash: tx.hash };
     } catch (error) {
+      if (error.message.includes('Wait for at least 2 blocks') && retryCount < 2) {
+        const waitTime = 2000;
+        addLog({type: 'simple', message: `Block wait required, retrying in ${waitTime / 1000}s...`});
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        return resolveBet(contract, betId, retryCount + 1);
+      }
       addLog({type: 'simple', message: `Resolve failed: ${error.message}`});
       throw error;
     }
@@ -312,31 +436,40 @@ const App = () => {
       return;
     }
     setIsBetting(true);
-    setStopRequested(false);
+    stopRequestedRef.current = false;
     try {
       const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
       const tokenContract = new ethers.Contract(TOKEN_ADDRESS, ERC20_ABI, signer);
       await approveToken(CONTRACT_ADDRESS, tokenContract);
 
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      addLog({type: 'simple', message: 'Waiting for allowance sync...'});
+
+      const newAllowance = await tokenContract.allowance(account, CONTRACT_ADDRESS);
+      const required = ethers.parseEther(betAmount.toString()) * BigInt(numBets);
+      if (newAllowance < required) {
+        addLog({type: 'simple', message: `Allowance still low, retrying approve...`});
+        await approveToken(CONTRACT_ADDRESS, tokenContract);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+
       for (let i = 0; i < numBets; i++) {
-        if (stopRequested) break;
-        const currentGuess = mode === '1' ? guess : '0123456789abcdef'.charAt(Math.floor(Math.random() * 16));
-        addLog({type: 'simple', message: `Attempting bet ${i+1}/${numBets} with guess ${currentGuess}`});
-        const { betId } = await placeBet(contract, currentGuess);
-        await new Promise(resolve => setTimeout(resolve, BLOCK_WAIT_TIME * 1000));
-        await resolveBet(contract, betId);
-        await new Promise(resolve => setTimeout(resolve, COOLDOWN * 1000));
-        updateBalance();
+        if (stopRequestedRef.current) {
+          addLog({type: 'simple', message: 'Betting stopped by user.'});
+          break;
+        }
+        await betIteration(contract, tokenContract, i);
       }
     } catch (error) {
       addLog({type: 'simple', message: `Betting process error: ${error.message}`});
     } finally {
       setIsBetting(false);
+      stopRequestedRef.current = false;
     }
   };
 
   const stopBetting = () => {
-    setStopRequested(true);
+    stopRequestedRef.current = true;
     addLog({type: 'simple', message: "Stopping betting..."});
   };
 
@@ -347,8 +480,7 @@ const App = () => {
   return (
     <div className="app-container">
       <header className="app-header">
-        <h1>Purple Betting Game</h1>
-        <p className="subtitle">Bet on the blockchain – Win big or go home!</p>
+        <h1>INK Betting Game</h1>
         <p className="visitor-count">Welcome, you are the {visitorCount}th visitor</p>
       </header>
       <div className="wallet-buttons">
@@ -364,10 +496,17 @@ const App = () => {
       </div>
       {account && (
         <div className="account-info">
-          <p>Account: {shortenHash(account)}</p>
-          <p>Balance: {balance} Purple</p>
+          <p>Account: {shortenHash(account)  } Balance: {balance} GTK</p>
         </div>
       )}
+      <div className="button-group">
+        <button className="instructions-btn" onClick={() => setModalIsOpen(true)}>
+          Instructions
+        </button>
+        <div className="vault-info">
+          Vault: {contractBalance} GTK
+        </div>
+      </div>
       <Modal
         isOpen={modalIsOpen}
         onRequestClose={() => setModalIsOpen(false)}
@@ -410,7 +549,7 @@ const App = () => {
         )}
         <div className="input-row">
           <div className="input-group">
-            <label>Bet Amount (Purple):</label>
+            <label>Bet Amount (GTK):</label>
             <input
               type="number"
               value={betAmount}
@@ -479,7 +618,7 @@ const App = () => {
                     {log.blockNumber}
                   </a>
                   Hash: 
-                  <a href={`${EXPLORER_URL}/block/${log.blockNumber}`} target="_blank" rel="noopener noreferrer" className="tx-link">
+                  <a href={`${EXPLORER_URL}/block/${log.blockHash}`} target="_blank" rel="noopener noreferrer" className="tx-link">
                     {shortenHash(log.blockHash)}
                   </a>, Target Byte: {log.targetByte}
                 </p>
@@ -492,7 +631,7 @@ const App = () => {
                   {log.won && (
                     <>
                       <br />
-                      Send {log.reward} Purple tx: 
+                      Send {log.reward} token tx: 
                       <a href={`${EXPLORER_URL}/tx/${log.txHash}`} target="_blank" rel="noopener noreferrer" className="tx-link">
                         {shortenHash(log.txHash)}
                       </a>
