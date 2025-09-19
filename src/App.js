@@ -496,7 +496,7 @@ const App = () => {
       </div>
       {account && (
         <div className="account-info">
-          <p>Account: {shortenHash(account)  } Balance: {balance} GTK</p>
+          <p>Account: {shortenHash(account)  } Balance: {balance} Purple</p>
         </div>
       )}
       <div className="button-group">
@@ -504,7 +504,7 @@ const App = () => {
           Instructions
         </button>
         <div className="vault-info">
-          Vault: {contractBalance} GTK
+          Vault: {contractBalance} Purple
         </div>
       </div>
       <Modal
@@ -549,7 +549,7 @@ const App = () => {
         )}
         <div className="input-row">
           <div className="input-group">
-            <label>Bet Amount (GTK):</label>
+            <label>Bet Amount (Purple):</label>
             <input
               type="number"
               value={betAmount}
