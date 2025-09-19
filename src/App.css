@@ -5,7 +5,7 @@
   margin: 0 auto;
   padding: 20px;
   font-family: 'Arial', sans-serif;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #667eea 0%, #4a90e2 100%);
   min-height: 100vh;
   color: white;
 }
@@ -46,6 +46,8 @@
 .button-group {
   display: flex;
   justify-content: center;
+  align-items: center;
+  gap: 10px;
 }
 
 .instructions-btn {
@@ -57,13 +59,22 @@
   cursor: pointer;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
   transition: transform 0.2s, box-shadow 0.2s;
-  border-top-left-radius: 50px;
-  border-bottom-left-radius: 50px;
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
+  border-radius: 25px;
 }
 
-.instructions-btn:hover{
+.claim-btn {
+  background: white;
+  border: none;
+  padding: 12px 24px;
+  color: black;
+  font-size: 1em;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s, box-shadow 0.2s;
+  border-radius: 25px;
+}
+
+.instructions-btn:hover, .claim-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
 }
@@ -194,7 +205,7 @@ select, .input-field {
 
 .modal-content {
   position: relative;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #667eea 0%, #4a90e2 100%);
   padding: 30px;
   border-radius: 15px;
   max-width: 500px;
@@ -264,6 +275,23 @@ select, .input-field {
   text-decoration: underline;
 }
 
+.vault-info {
+  font-size: 1em;
+  color: white;
+  font-weight: bold;
+  background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+  padding: 12px 24px;
+  border-radius: 25px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  transition: box-shadow 0.2s;
+}
+
+.vault-info:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
 /* Responsive for mobile */
 @media (max-width: 600px) {
   .app-container {
@@ -294,10 +322,17 @@ select, .input-field {
   .button-group {
     flex-direction: row;
     justify-content: center;
+    gap: 5px;
+    flex-wrap: wrap;
   }
 
   .input-row {
     flex-direction: column;
     gap: 15px;
+  }
+
+  .vault-info {
+    padding: 10px 20px;
+    font-size: 0.9em;
   }
 }
