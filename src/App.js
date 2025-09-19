@@ -105,7 +105,7 @@ const CONTRACT_ADDRESS = "0xB500c062dE1445B9E2A08B71968DD9AC34eA6477";
 const TOKEN_ADDRESS = "0xD642B49d10cc6e1BC1c6945725667c35e0875f22";
 const EXPLORER_URL = "https://explorer.inkonchain.com/";
 const COOLDOWN = 1; // seconds
-const BLOCK_WAIT_TIME = 2; // seconds
+const BLOCK_WAIT_TIME = 4; // seconds
 const INK_CHAIN_ID_HEX = "0xDEF1"; // 57073 in hex
 
 
